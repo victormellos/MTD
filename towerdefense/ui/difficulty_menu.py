@@ -83,6 +83,7 @@ def draw_difficulty_menu(game, surf):
     surf.blit(sub, srect)
 
     mouse_pos = game.mouse_pos
+    theme.draw_back_button(surf, mouse_pos)
     font_name = get_font(17, bold=True)
     font_desc = get_font(11)
     font_stat = get_font(11, bold=True)

@@ -230,6 +230,24 @@ def draw_game_over(game, surf):
     t3 = font_med.render(f"Total de abates: {game.total_kills}", True, COL_TEXT_DIM)
     r3 = t3.get_rect(center=(WIDTH // 2, panel_rect.y + 170))
     surf.blit(t3, r3)
-    t4 = font_med.render("Pressione R para escolher outro mapa", True, COL_GOLD)
-    r4 = t4.get_rect(center=(WIDTH // 2, panel_rect.y + 238))
-    surf.blit(t4, r4)
+
+    # botao tocavel (equivalente ao atalho de teclado R) -- essencial no
+    # mobile, onde nao ha tecla R; ver game_over_button_rect().
+    btn_rect = game_over_button_rect(panel_rect)
+    btn_label = font_med.render("Escolher outro mapa", True, COL_WHITE)
+    theme.button(surf, btn_rect, game.mouse_pos, COL_GOLD, btn_label, radius=10)
+    hint = get_font(13).render("(ou aperte R)", True, COL_TEXT_DIM)
+    hrect = hint.get_rect(midtop=(WIDTH // 2, btn_rect.bottom + 6))
+    surf.blit(hint, hrect)
+
+
+def game_over_button_rect(panel_rect=None):
+    """Rect do botao 'Escolher outro mapa' na tela de game over. Aceita
+    o panel_rect ja calculado (evita recalcular) ou recalcula sozinho se
+    chamado so pra testar clique/toque, como os outros *_rect() do pacote."""
+    if panel_rect is None:
+        panel_rect = pygame.Rect(0, 0, 560, 300)
+        panel_rect.center = (WIDTH // 2, HEIGHT // 2)
+    rect = pygame.Rect(0, 0, 260, 46)
+    rect.center = (WIDTH // 2, panel_rect.y + 230)
+    return rect

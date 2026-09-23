@@ -176,3 +176,22 @@ def button(surf, rect, mouse_pos, base_color, label_surf, enabled=True,
                shadow=enabled, top_highlight=enabled)
     surf.blit(label_surf, label_surf.get_rect(center=rect.center))
     return hovered
+
+
+def back_button_rect():
+    """Rect do botao 'Voltar' padrao, sempre no canto superior esquerdo
+    das telas de menu (map_select, difficulty_select). Existe pra dar
+    um jeito tocavel de fazer o que o ESC ja faz no teclado -- essencial
+    no mobile, onde nao ha ESC (ver towerdefense/ui/mobile_bar.py)."""
+    return pygame.Rect(24, 24, 120, 40)
+
+
+def draw_back_button(surf, mouse_pos):
+    """Desenha o botao 'Voltar' padrao e retorna seu rect (pra o chamador
+    testar clique/toque com collidepoint, mesmo padrao dos outros
+    *_rects() deste pacote)."""
+    from ..fonts import get_font
+    rect = back_button_rect()
+    label = get_font(15, bold=True).render("< Voltar", True, (235, 235, 240))
+    button(surf, rect, mouse_pos, (150, 160, 180), label, radius=9)
+    return rect

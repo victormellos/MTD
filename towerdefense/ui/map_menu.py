@@ -74,6 +74,7 @@ def draw_map_menu(game, surf):
     surf.blit(sub, srect)
 
     mouse_pos = game.mouse_pos
+    theme.draw_back_button(surf, mouse_pos)
     font_name = get_font(20, bold=True)
     font_diff = get_font(13, bold=True)
     font_desc = get_font(13)

@@ -60,6 +60,16 @@ def _dir_is_writable(path):
 
 
 def _candidate_dirs():
+    # Android (rodando via python-for-android/buildozer): NAO tem uma
+    # pasta de usuario "de verdade" tipo Windows/Linux desktop, e o app
+    # nao tem permissao de escrever fora da propria area privada sem
+    # pedir permissao de armazenamento ao usuario. `ANDROID_PRIVATE` e
+    # uma env var que o proprio p4a define com o caminho certo (dados
+    # privados do app, sempre gravavel, apagado so se o usuario desinstalar
+    # o app) -- ver towerdefense/config.py:IS_MOBILE para a deteccao.
+    android_private = os.environ.get("ANDROID_PRIVATE")
+    if android_private:
+        return [os.path.join(android_private, "MTD")]
     if sys.platform.startswith("win"):
         drive = os.environ.get("SystemDrive", "C:")
         if not drive.endswith(":"):

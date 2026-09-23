@@ -25,7 +25,8 @@ from .systems import WaveManager, MetaUpgrades, AbilityController, combat, vfx
 from . import upgrades as up
 from . import save_system
 from .fonts import get_font
-from .ui import hud, menus, board, map_menu, difficulty_menu, main_menu, tower_panel
+from .ui import hud, menus, board, map_menu, difficulty_menu, main_menu, tower_panel, mobile_bar, theme
+from .config import IS_MOBILE
 
 # Autosave a cada N segundos de jogo (alem do save imediato ao fechar o
 # jogo) -- ver Game.update / Game._autosave_tick.
@@ -113,6 +114,20 @@ class Game:
         """Grava a partida atual em disco. So chamado com uma partida
         de verdade em andamento (ver chamadas em update()/run())."""
         save_system.save_game(self)
+
+    def _minimize_android(self):
+        """Manda o app Android pro segundo plano (equivalente ao botao
+        Home), em vez de matar o processo (ver uso em K_ESCAPE acima).
+        Usa pyjnius (disponivel no bootstrap SDL2 do python-for-android)
+        pra chamar Activity.moveTaskToBack; se pyjnius nao existir (rodando
+        no desktop com MTD_FORCE_MOBILE=1 so pra testar o layout, por
+        exemplo) simplesmente nao faz nada -- nunca derruba o jogo."""
+        try:
+            from jnius import autoclass
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            PythonActivity.mActivity.moveTaskToBack(True)
+        except Exception:
+            pass
 
     def _trigger_game_over(self):
         """Marca fim de partida e apaga o save em disco: a corrida
@@ -1043,6 +1058,7 @@ class Game:
             self.canvas.blit(surf, (x - surf.get_width() / 2, y))
 
         hud.draw_hud(self, self.canvas)
+        mobile_bar.draw(self, self.canvas)
 
         # loja de gemas: por cima de absolutamente tudo, inclusive HUD
         menus.draw_meta_shop(self, self.canvas)
@@ -1077,6 +1093,15 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif IS_MOBILE and event.type == getattr(pygame, "APP_WILLENTERBACKGROUND", -1):
+                    # o Android pode suspender o app a qualquer momento sem
+                    # passar pelo botao Voltar (tecla Home, troca de app,
+                    # ligacao recebida...) -- salva na hora, igual ao save
+                    # que ja acontecia ao fechar a janela no desktop, senao
+                    # esse progresso se perderia.
+                    if self.state == "playing" and not self.game_over:
+                        self.save_to_disk()
+                    save_system.save_meta(self)
                 elif event.type == pygame.VIDEORESIZE:
                     # janela livre foi redimensionada (arrastando a borda,
                     # maximizando etc.) -- so recalcula a area de escala;
@@ -1084,6 +1109,12 @@ class Game:
                     if not self.is_fullscreen:
                         self.handle_resize(event.size)
                 elif event.type == pygame.KEYDOWN:
+                    # botao fisico "Voltar" do Android (K_AC_BACK) reusa a
+                    # MESMA cascata de ESC (fechar ajuda -> voltar de menu
+                    # -> cancelar colocacao -> sair) em vez de duplicar a
+                    # logica -- so tratamos como se fosse ESC.
+                    if IS_MOBILE and event.key == getattr(pygame, "K_AC_BACK", None):
+                        event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
                     if event.key == pygame.K_F11:
                         self.toggle_fullscreen()
                     elif event.key == pygame.K_ESCAPE and self.state == "main_menu" and self.show_help:
@@ -1095,7 +1126,21 @@ class Game:
                     elif event.key == pygame.K_ESCAPE and self.selected_shop_type is not None:
                         self.selected_shop_type = None  # cancela o modo de colocacao antes de sair
                     elif event.key == pygame.K_ESCAPE:
-                        running = False
+                        if IS_MOBILE:
+                            # no Android, "sair" de verdade (matar o processo)
+                            # nao e o comportamento esperado do botao Voltar
+                            # sem nenhum menu aberto -- so minimiza o app,
+                            # deixando o sistema operacional decidir se/quando
+                            # ele e encerrado (mesmo padrao de qualquer app
+                            # Android). Salva antes, pelo mesmo motivo do
+                            # APP_WILLENTERBACKGROUND acima: o processo pode
+                            # ser encerrado a qualquer momento depois disso.
+                            if self.state == "playing" and not self.game_over:
+                                self.save_to_disk()
+                            save_system.save_meta(self)
+                            self._minimize_android()
+                        else:
+                            running = False
                     elif self.state == "main_menu":
                         pass  # sem atalhos extras; usar os botoes do menu
                     elif self.state == "map_select":
@@ -1133,7 +1178,10 @@ class Game:
                         # jogo (rects de UI, grade, etc.) continua raciocinando
                         # nas mesmas coordenadas fixas de sempre.
                         pos = self.window_to_canvas(event.pos)
-                        if self.state == "main_menu":
+                        if self.game_over:
+                            if hud.game_over_button_rect().collidepoint(pos):
+                                self.state = "map_select"
+                        elif self.state == "main_menu":
                             if self.show_help:
                                 if main_menu.help_close_rect().collidepoint(pos):
                                     self.show_help = False
@@ -1152,15 +1200,21 @@ class Game:
                                             running = False
                                         break
                         elif self.state == "map_select":
-                            for rect, map_id in map_menu.map_card_rects():
-                                if rect.collidepoint(pos):
-                                    self.choose_map(map_id)
-                                    break
+                            if theme.back_button_rect().collidepoint(pos):
+                                self.state = "main_menu"
+                            else:
+                                for rect, map_id in map_menu.map_card_rects():
+                                    if rect.collidepoint(pos):
+                                        self.choose_map(map_id)
+                                        break
                         elif self.state == "difficulty_select":
-                            for rect, diff_id in difficulty_menu.difficulty_card_rects():
-                                if rect.collidepoint(pos):
-                                    self.choose_difficulty(diff_id)
-                                    break
+                            if theme.back_button_rect().collidepoint(pos):
+                                self.state = "map_select"
+                            else:
+                                for rect, diff_id in difficulty_menu.difficulty_card_rects():
+                                    if rect.collidepoint(pos):
+                                        self.choose_difficulty(diff_id)
+                                        break
                         elif self.meta_shop_open:
                             self.handle_meta_shop_click(pos)
                         elif self.gem_button_rect is not None and self.gem_button_rect.collidepoint(pos):
@@ -1169,6 +1223,8 @@ class Game:
                             self.selected_shop_type = None
                         elif self.skip_button_rect is not None and self.skip_button_rect.collidepoint(pos):
                             self.skip_current_wave()
+                        elif IS_MOBILE and mobile_bar.handle_tap(self, pos):
+                            pass  # toque consumido pela barra mobile (pausa/onda/painel/mapas)
                         else:
                             self.handle_click_down(pos)
                 elif event.type == pygame.MOUSEBUTTONUP:

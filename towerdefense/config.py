@@ -23,6 +23,22 @@ TOP_HUD_HEIGHT = 90
 # algo precisar de novo de uma faixa inferior - hoje vale 0.
 BOTTOM_HUD_HEIGHT = 0
 
+# Compatibilidade mobile/Android (touch, sem teclado fisico): liga uma
+# barra inferior de botoes que cobre os atalhos de teclado essenciais
+# (pausar, pular onda, abrir painel de torres, menu de mapas, sair).
+# Detectado automaticamente pela plataforma relatada pelo SDL/python-for-
+# android; pode ser forcado via variavel de ambiente MTD_FORCE_MOBILE=1
+# (util pra testar o layout mobile rodando no desktop).
+import os as _os
+import sys as _sys
+IS_MOBILE = (
+    _sys.platform == "android"
+    or _os.environ.get("ANDROID_ARGUMENT") is not None
+    or _os.environ.get("MTD_FORCE_MOBILE") == "1"
+)
+if IS_MOBILE:
+    BOTTOM_HUD_HEIGHT = 96
+
 # A altura da janela e derivada da grade (nao um numero solto): assim o
 # grid nunca fica cortado/sobreposto por uma eventual barra inferior.
 WIDTH = 1280
